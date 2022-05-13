@@ -1,6 +1,6 @@
-Exercise 2
+Exercise_2
 ================
-Diwei Zhu
+Diwei_Zhu
 
 ``` r
 library(readr)
@@ -41,9 +41,9 @@ g <- graph_from_data_frame(egde, directed=FALSE)
 g
 ```
 
-    ## IGRAPH 888a010 UN-- 10 17 -- 
+    ## IGRAPH 978746b UN-- 10 17 -- 
     ## + attr: name (v/c)
-    ## + edges from 888a010 (vertex names):
+    ## + edges from 978746b (vertex names):
     ##  [1] 1--2 2--A 3--D 3--C 3--B 3--4 3--5 4--C 5--D 5--6 6--D 6--B D--B D--C B--C
     ## [16] B--A A--C
 
