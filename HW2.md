@@ -41,16 +41,16 @@ g <- graph_from_data_frame(egde, directed=FALSE)
 g
 ```
 
-    ## IGRAPH d6bbb0e UN-- 10 17 -- 
+    ## IGRAPH d57b9e0 UN-- 10 17 -- 
     ## + attr: name (v/c)
-    ## + edges from d6bbb0e (vertex names):
+    ## + edges from d57b9e0 (vertex names):
     ##  [1] 1--2 2--A 3--D 3--C 3--B 3--4 3--5 4--C 5--D 5--6 6--D 6--B D--B D--C B--C
     ## [16] B--A A--C
 
 Plot the network with seat label next to each node.
 
 ``` r
-plot(g, layout=layout.fruchterman.reingold,
+p <- plot(g, layout=layout.fruchterman.reingold,
     vertex.size = 10,
     vertex.label = V(g)$name, # Set the labels (Node)
     vertex.label.cex = 0.8,   # Slightly smaller font
@@ -60,6 +60,12 @@ plot(g, layout=layout.fruchterman.reingold,
 ```
 
 ![](HW2_files/figure-gfm/2-1.png)<!-- -->
+
+``` r
+p
+```
+
+    ## NULL
 
 ## Betweenness Centrality
 
@@ -81,7 +87,7 @@ Plot the network graph with labels and betweenness centrality values.
 V(g)$betweenness <- round(betweenness(g),4)
 label1 <- paste(V(g)$name,V(g)$betweenness,sep=":")
   
-plot(g, layout=layout.fruchterman.reingold,
+p1 <- plot(g, layout=layout.fruchterman.reingold,
     vertex.size = 10,          
     vertex.label = label1, # Set the labels (Node:betweenness)
     vertex.label.cex = 0.8,   
@@ -91,6 +97,12 @@ plot(g, layout=layout.fruchterman.reingold,
 ```
 
 ![](HW2_files/figure-gfm/3.1-1.png)<!-- -->
+
+``` r
+p1
+```
+
+    ## NULL
 
 ## Degree Centrality
 
@@ -110,7 +122,7 @@ Plot the network graph with labels and degree centrality values.
 V(g)$degree <- degree(g)
 label2 <- paste(V(g)$name,V(g)$degree,sep=":")
   
-plot(g, layout=layout.fruchterman.reingold,
+p2 <- plot(g, layout=layout.fruchterman.reingold,
     vertex.size = 10,          
     vertex.label = label2, # Set the labels (Node:degree)
     vertex.label.cex = 0.8,   
@@ -120,6 +132,12 @@ plot(g, layout=layout.fruchterman.reingold,
 ```
 
 ![](HW2_files/figure-gfm/4.1-1.png)<!-- -->
+
+``` r
+p2
+```
+
+    ## NULL
 
 ## Closeness Centrality
 
@@ -141,7 +159,7 @@ Plot the network graph with labels and closeness centrality values.
 V(g)$closeness <- round(closeness(g),4)
 label3 <- paste(V(g)$name,V(g)$closeness,sep=":")
   
-plot(g, layout=layout.fruchterman.reingold,
+p3 <- plot(g, layout=layout.fruchterman.reingold,
     vertex.size = 10,          
     vertex.label = label3, # Set the labels (Node:closeness)
     vertex.label.cex = 0.8,   
@@ -151,6 +169,12 @@ plot(g, layout=layout.fruchterman.reingold,
 ```
 
 ![](HW2_files/figure-gfm/5.1-1.png)<!-- -->
+
+``` r
+p3
+```
+
+    ## NULL
 
 ## Choice of seat
 
