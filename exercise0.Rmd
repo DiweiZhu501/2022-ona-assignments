@@ -1,0 +1,22 @@
+---
+title: '00'
+author: "Diwei Zhu"
+date: "5/2/2022"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#install.packages("tidyverse")
+```{r}
+library(tidyverse)
+```
+
+#install.packages("igraph")
+```{r}
+library(igraph)
+```
+
+"Hello, network!"
