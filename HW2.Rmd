@@ -1,8 +1,12 @@
 ---
 title: "Exercise_2"
 author: "Diwei_Zhu"
-output: github_document
+output: word_document
 ---
+
+```{r}
+options(tinytex.verbose = TRUE)
+```
 
 ```{r}
 library(readr)

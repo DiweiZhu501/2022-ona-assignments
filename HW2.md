@@ -3,6 +3,10 @@ Exercise_2
 Diwei_Zhu
 
 ``` r
+options(tinytex.verbose = TRUE)
+```
+
+``` r
 library(readr)
 library(igraph)
 ```
@@ -41,9 +45,9 @@ g <- graph_from_data_frame(egde, directed=FALSE)
 g
 ```
 
-    ## IGRAPH 84a8010 UN-- 10 17 -- 
+    ## IGRAPH 17589ac UN-- 10 17 -- 
     ## + attr: name (v/c)
-    ## + edges from 84a8010 (vertex names):
+    ## + edges from 17589ac (vertex names):
     ##  [1] 1--2 2--A 3--D 3--C 3--B 3--4 3--5 4--C 5--D 5--6 6--D 6--B D--B D--C B--C
     ## [16] B--A A--C
 
@@ -59,7 +63,7 @@ plot(g, layout=layout.fruchterman.reingold,
     vertex.color = "orange")
 ```
 
-![](HW2_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](HW2_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 ## Betweenness Centrality
 
@@ -90,7 +94,7 @@ plot(g, layout=layout.fruchterman.reingold,
     vertex.color = "darkolivegreen3")
 ```
 
-![](HW2_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](HW2_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 ## Degree Centrality
 
@@ -119,7 +123,7 @@ plot(g, layout=layout.fruchterman.reingold,
     vertex.color = "rosybrown1")
 ```
 
-![](HW2_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](HW2_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 ## Closeness Centrality
 
@@ -150,7 +154,7 @@ plot(g, layout=layout.fruchterman.reingold,
     vertex.color = "slateblue1")
 ```
 
-![](HW2_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](HW2_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ## Choice of seat
 
