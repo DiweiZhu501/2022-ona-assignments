@@ -1,0 +1,368 @@
+---
+title: "HW4"
+author: "Diwei Zhu"
+date: "5/25/2022"
+output: github_document
+---
+
+```{r,include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(arrow)
+library(readr)
+library(gender)
+library(lubridate)
+library(ggplot2)
+library(igraph)
+library(ggraph)
+library(tidygraph)
+library(dplyr)
+library(ggcorrplot)
+library(party)
+```
+
+### 1. Load data, get gender, and create `app_proc_time` column
+
+### Load data
+```{r}
+data_path <- "C:/Users/admin/Documents/R projects/2022-ona-assignments/"
+applications <- read_parquet(paste0(data_path,"app_data_sample.parquet"))
+edges <- read_csv(paste0(data_path,"edges_sample.csv"))
+
+applications
+edges
+```
+
+### Get gender for examiners
+```{r}
+# get examiner names
+examiner_names <- applications %>% 
+  distinct(examiner_name_first)
+
+# get gender from their names
+examiner_names_gender <- examiner_names %>% 
+  do(results = gender(.$examiner_name_first, method = "ssa")) %>% 
+  unnest(cols = c(results), keep_empty = TRUE) %>% 
+  select(
+    examiner_name_first = name,
+    gender,
+    proportion_female
+  )
+
+# remove extra columns from the gender table
+examiner_names_gender <- examiner_names_gender %>% 
+  select(examiner_name_first, gender)
+
+# joining gender back to the dataset
+applications <- applications %>% 
+  left_join(examiner_names_gender, by = "examiner_name_first")
+
+# cleaning up
+rm(examiner_names)
+rm(examiner_names_gender)
+gc()
+```
+
+### Get end dates (patent issue date or patent abandon date)
+```{r}
+applications <- applications %>% 
+  mutate(patent_issue_date = coalesce(patent_issue_date, abandon_date))
+
+names(applications)[11] <- "end_date"
+```
+
+### Drop na based on end_date, gender, and filing_date
+```{r}
+applications <- drop_na(applications, end_date)
+applications <- drop_na(applications, gender)
+applications <- drop_na(applications, filing_date)
+```
+
+### Change end_date and filing_date to Date-Time data type, then calculate the application processing time as days
+```{r}
+applications$filing_date <- strptime(as.Date(applications$filing_date), "%Y-%m-%d")
+applications$end_date <- strptime(as.Date(applications$end_date), "%Y-%m-%d")
+
+applications$app_proc_time0 <- as.Date(applications$end_date) - as.Date(applications$filing_date)
+```
+
+### We noticed that there are negative time difference, which, needed to be removed.
+```{r}
+# index of rows that need to be dropped
+to_drop <- c()
+
+# create "0 day time difference" value
+zeroday <- 0
+zeroday1 <- as.difftime(zeroday, units = "days")
+
+for (i in c(1: nrow(applications))) {
+  if (applications$app_proc_time0[i] < zeroday1) {
+    to_drop = c(to_drop, i)
+  }
+}
+
+# drop selected rows
+applications <- applications[-to_drop, ]
+```
+
+### Create the numeric `app_proc_time` column
+```{r}
+applications$app_proc_time <- as.numeric(applications$app_proc_time0, units="days")
+```
+Now that we have the clean `app_proc_time` column that can be used in following steps. 
+
+
+
+## 2. Prepare edges list and calculate centralities
+
+### Choose work group 164 and 241
+```{r}
+w164 <- subset(applications, grepl("^164", applications$examiner_art_unit))
+w164$gender <- factor(w164$gender)
+w241 <- subset(applications, grepl("^241", applications$examiner_art_unit))
+w241$gender <- factor(w241$gender)
+```
+
+### Pre-process egdes list
+```{r}
+edges <- drop_na(edges, ego_examiner_id)
+edges <-drop_na(edges, alter_examiner_id)
+
+# join eges to the work group dataset by application number
+w164_edges <- inner_join(w164, edges, by = "application_number", copy = FALSE) 
+w241_edges <- inner_join(w241, edges, by = "application_number", copy = FALSE)
+
+# fix the problem where examiner_id not equal to both ego and alter examiner id
+to_drop0 <- c()
+to_drop1 <- c()
+
+for (i in c(1: nrow(w164_edges))) {
+  if ((w164_edges$examiner_id[i] != w164_edges$ego_examiner_id[i])&(w164_edges$examiner_id[i] != w164_edges$alter_examiner_id[i])) {
+    to_drop0 = c(to_drop0, i)
+  }
+}
+for (i in c(1: nrow(w241_edges))) {
+  if ((w241_edges$examiner_id[i] != w241_edges$ego_examiner_id[i])&(w241_edges$examiner_id[i] != w241_edges$alter_examiner_id[i])) {
+    to_drop1 = c(to_drop1, i)
+  }
+}
+# drop selected rows
+w164_edges <- w164_edges[-to_drop0, ]
+w241_edges <- w241_edges[-to_drop1, ]
+```
+
+### Create nodes list
+```{r}
+# nodes dataframe of work groups and merge them
+w164_nodes_ego <- w164_edges %>% 
+  distinct(ego_examiner_id) %>%
+  rename(examiner_id = ego_examiner_id)
+
+w164_nodes_alter <- w164_edges %>% 
+  distinct(alter_examiner_id) %>%
+  rename(examiner_id = alter_examiner_id)
+
+w241_nodes_ego <- w241_edges %>% 
+  distinct(ego_examiner_id) %>%
+  rename(examiner_id = ego_examiner_id)
+
+w241_nodes_alter <- w241_edges %>% 
+  distinct(alter_examiner_id) %>%
+  rename(examiner_id = alter_examiner_id)
+
+# merge the two dataframes for each work goup
+w164_nodes <- union_all(w164_nodes_ego, w164_nodes_alter)
+w241_nodes <- union_all(w241_nodes_ego, w241_nodes_alter)
+
+w164_nodes <- unique(w164_nodes)
+w241_nodes <- unique(w241_nodes)
+
+head(w164_nodes, 5)
+```
+
+### Create edge list for centrality calculation
+```{r}
+w164_edges_f <- w164_edges %>% 
+  select(ego_examiner_id, alter_examiner_id)
+
+w241_edges_f <- w241_edges %>% 
+  select(ego_examiner_id, alter_examiner_id)
+
+head(w164_edges_f, 5)
+```
+
+### Create graph then calculate centralities
+```{r}
+g_w164 <- graph_from_data_frame(w164_edges_f, directed=FALSE)
+g_w241 <- graph_from_data_frame(w241_edges_f, directed=FALSE)
+
+# betweenness
+bc_w164 <- betweenness(g_w164)
+bc_w241 <- betweenness(g_w241)
+
+# degree
+dg_w164 <- degree(g_w164)
+dg_w241 <- degree(g_w241)
+
+# closeness
+cc_w164 <- closeness(g_w164)
+cc_w241 <- closeness(g_w241)
+
+# eigen vector
+ei_164 <- eigen_centrality(g_w164)$vector
+ei_241 <- eigen_centrality(g_w241)$vector
+```
+
+### Put calculated centralities into a dataframe and then concatenate side-by-side with nodes dataframe
+```{r}
+centralities_164 <- cbind(bc_w164, dg_w164, cc_w164, ei_164)
+centralities_241 <- cbind(bc_w241, dg_w241, cc_w241, ei_241)
+
+centralities_df_164 <- cbind(w164_nodes, centralities_164)
+centralities_df_241 <- cbind(w241_nodes, centralities_241)
+
+head(centralities_df_164, 5)
+```
+
+### Join the centralities and to the main dataset by examiner ID
+```{r}
+processed_164 <- inner_join(w164_edges, centralities_df_164, by = "examiner_id", copy = FALSE)
+processed_241 <- inner_join(w241_edges, centralities_df_241, by = "examiner_id", copy = FALSE)
+head(processed_164, 5)
+```
+
+## 3. Fit linear regression models for work group 164
+
+### Correlation check
+```{r}
+quantvars <- select_if(processed_164, is.numeric)
+
+# populating correlation matrix
+corr_matrix = cor(quantvars)
+corr_matrix <- round(corr_matrix, 2)
+
+ggcorrplot(corr_matrix)
+```
+From the correlation matrix we can see that the target variable `app_proc_time` has no strong correlation with other numeric variables. The centralities have strong correlation with each other.
+
+
+### Drop unrelated predictors based on subjective judges, then change categorical predictors to factors
+```{r}
+to_drop2 <- c("application_number","examiner_name_first","examiner_name_last","examiner_name_middle","filing_date", "end_date", "abandon_date", "app_proc_time0", "appl_status_date", "advice_date","tc","ego_examiner_id","alter_examiner_id","examiner_id","patent_number")
+processed_164_f <- processed_164[ , !(names(processed_164) %in% to_drop2)]
+
+# as.factor
+processed_164_f$gender <- as.factor(processed_164_f$gender)
+processed_164_f$disposal_type <- as.factor(processed_164_f$disposal_type)
+processed_164_f$uspc_class <- as.factor(processed_164_f$uspc_class)
+processed_164_f$uspc_subclass <- as.factor(processed_164_f$uspc_subclass)
+
+# rename
+names(processed_164_f)[8] <- "betweenness"
+names(processed_164_f)[9] <- "degree"
+names(processed_164_f)[10] <- "closeness"
+names(processed_164_f)[11] <- "eigen"
+```
+
+### Random forest feature selection
+```{r}
+cf1 <- cforest(app_proc_time ~ . , data= processed_164_f, control=cforest_unbiased(mtry=2,ntree=50))
+rank1 <- sort(varimp(cf1), decreasing = TRUE)
+rank1
+```
+uspc_subclass is the strongest predictor, followed by the centralities and gender.
+
+
+### For work group 164, create models that (1) predictors are only the centralities, and (2) uspc_subclass is also a predictor
+```{r}
+model_164a <- lm(app_proc_time ~ betweenness+degree+closeness+eigen, data=processed_164_f)
+model_164b <- lm(app_proc_time ~ uspc_subclass+betweenness+degree+closeness+eigen, data=processed_164_f)
+summary(model_164a)
+summary(model_164b)
+```
+The R^2 of the first model is only 0.055. All of the centalities are negatively related to the target variable. But the degree centrality is not significant. With the subclass predictor, the R^2 of model 2 increased to 0.22.
+
+
+## 4. Fit linear regression models for work group 241
+
+### Correlation check
+```{r}
+quantvars <- select_if(processed_241, is.numeric)
+
+# populating correlation matrix
+corr_matrix = cor(quantvars)
+corr_matrix <- round(corr_matrix, 2)
+
+ggcorrplot(corr_matrix)
+```
+Similar to work group 164, from the correlation matrix we can see that the target variable `app_proc_time` has no strong correlation with other numeric variables. 
+
+### Drop unrelated predictors based on subjective judges, then change categorical predictors to factors
+```{r}
+to_drop3 <- c("application_number","examiner_name_first","examiner_name_last","examiner_name_middle","filing_date", "end_date", "abandon_date", "app_proc_time0", "appl_status_date", "advice_date","tc","ego_examiner_id","alter_examiner_id","examiner_id","patent_number")
+processed_241_f <- processed_241[ , !(names(processed_241) %in% to_drop3)]
+
+# as.factor
+processed_241_f$gender <- as.factor(processed_241_f$gender)
+processed_241_f$disposal_type <- as.factor(processed_241_f$disposal_type)
+processed_241_f$uspc_class <- as.factor(processed_241_f$uspc_class)
+processed_241_f$uspc_subclass <- as.factor(processed_241_f$uspc_subclass)
+
+# rename
+names(processed_241_f)[8] <- "betweenness"
+names(processed_241_f)[9] <- "degree"
+names(processed_241_f)[10] <- "closeness"
+names(processed_241_f)[11] <- "eigen"
+```
+
+### Random forest feature selection
+```{r}
+cf2 <- cforest(app_proc_time ~ . , data= processed_241_f, control=cforest_unbiased(mtry=2,ntree=50))
+rank2 <- sort(varimp(cf1), decreasing = TRUE)
+rank2
+```
+
+
+### For work group 241, create models that (1) predictors are only the centralities, and (2) uspc_subclass is also a predictor
+```{r}
+model_241a <- lm(app_proc_time ~ betweenness+degree+closeness+eigen, data=processed_241_f)
+model_241b <- lm(app_proc_time ~ uspc_subclass+betweenness+degree+closeness+eigen, data=processed_241_f)
+summary(model_241a)
+summary(model_241b)
+```
+The R^2 of the first model is only 0.085. All of the centralities are negatively related to the target variable, but in this group, the betas are smaller. The closeness centrality and the eigen vector centrality are not significant. With the subclass predictor, the R^2 of model 2 increased to 0.44.
+
+
+## 5. Model based on the concatenated dataset of the two work groups
+
+### Concatenate the two work groups to have a larger dataset 
+```{r}
+conc <- rbind(processed_164_f, processed_241_f)
+nrow(conc)
+```
+### Build lm() models based on concatenated dataframe
+The R^2 of the first model is only 0.052. 
+Betweenness centrality and eigen vector centrality have a positive relationship with the target variable, meaning that higher betweenness centality and eigen vector centrality links to a longer application process time.
+
+Contrastingly, degree centrality and closeness centrality have a negative relationship with the target variable, meaning that the higher the degree centality or clossness centrality, the shorter the application process time.
+
+By including the subclass predictor, the R^2 of model 2 increased to 0.29.
+```{r}
+model_conc_a <- lm(app_proc_time ~ betweenness+degree+closeness+eigen, data=conc)
+model_conc_b <- lm(app_proc_time ~ uspc_subclass+betweenness+degree+closeness+eigen, data=conc)
+summary(model_conc_a)
+summary(model_conc_b)
+```
+
+
+## 6. Take gender into consideration
+The effects of gender on the relationships between centralities and the process time are significant, except for eigen vector. A male examiner usually means a shorter process time in the two select work groups, while a male examiner with high degree and closeness centrality usually means a longer process time compared to those who have low centralities. 
+
+The R^2 of the model is 0.071.
+```{r}
+model_gender <- lm(app_proc_time ~ gender*betweenness+gender*degree+gender*closeness+gender*eigen, data=conc)
+summary(model_gender)
+```
+
+We find the inconsistency across the models. With a larger dataset (i.e. all workgroups), the result would be more reliable for USPTO.

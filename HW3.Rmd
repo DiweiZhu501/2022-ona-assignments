@@ -2,7 +2,7 @@
 title: "HW3"
 author: "Diwei Zhu"
 date: "5/18/2022"
-output: github_document
+output: pdf_document
 ---
 
 
@@ -297,7 +297,6 @@ w241_edges <- w241_2 %>%
 
 head(w164_edges, 5)
 ```
-
 
 
 ```{r}
