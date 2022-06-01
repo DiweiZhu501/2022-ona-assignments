@@ -2,7 +2,7 @@
 title: "HW4"
 author: "Diwei Zhu"
 date: "5/25/2022"
-output: github_document
+output: pdf_document
 ---
 
 ```{r,include=FALSE}
